@@ -36,8 +36,8 @@ def add_task():
         db.session.add(new_task)
         db.session.commit()
         return make_response(jsonify(new_task.to_dict()), 201)
-    except:
-        return make_response(jsonify({"error": "Could not add task"}), 500)
+    except Exception as e:
+        return make_response(jsonify({"error": f"Could not add task: {e}"}), 500)
 
 @app.route('/tasks/<int:id>', methods=['DELETE'])
 def delete_task(id):
