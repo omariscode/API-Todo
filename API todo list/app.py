@@ -1,10 +1,14 @@
 from flask import Flask, request, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from flask-cors import CORS
+
+
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 db = SQLAlchemy(app)
+CORS(app)
 
 class Todo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
