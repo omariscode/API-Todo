@@ -9,10 +9,16 @@ db = SQLAlchemy(app)
 class Todo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.String(200), nullable=False)
+    completed = db.Column(db.Boolean, default=False)
     date_created = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
-        return {"id": self.id, "content": self.content, "date_created": self.date_created}
+        return {
+            "id": self.id,
+            "content": self.content,
+            "completed": self.completed,
+            "date_created": self.date_created
+        }
 
 @app.route('/tasks', methods=['GET'])
 def get_tasks():
@@ -25,7 +31,7 @@ def add_task():
     if not data or 'content' not in data:
         return make_response(jsonify({"error": "Content is required"}), 400)
     
-    new_task = Todo(content=data['content'])
+    new_task = Todo(content=data['content'], completed=data.get('completed', False))
     try:
         db.session.add(new_task)
         db.session.commit()
@@ -51,6 +57,7 @@ def update_task(id):
         return make_response(jsonify({"error": "Content is required"}), 400)
     
     task.content = data['content']
+    task.completed = data.get('completed', task.completed)
     try:
         db.session.commit()
         return make_response(jsonify(task.to_dict()), 200)
@@ -61,3 +68,4 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True, port=8000, host='0.0.0.0')
+
