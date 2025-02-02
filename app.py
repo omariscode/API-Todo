@@ -1,29 +1,25 @@
 from flask import Flask, request, jsonify, make_response
-from flask_sqlalchemy import SQLAlchemy
+import json
+import os
 from datetime import datetime
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
-db = SQLAlchemy(app)
+TASKS_FILE = "tasks.json"
 
-class Todo(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.String(200), nullable=False)
-    completed = db.Column(db.Boolean, default=False)
-    date_created = db.Column(db.DateTime, default=datetime.utcnow)
+def load_tasks():
+    if os.path.exists(TASKS_FILE):
+        with open(TASKS_FILE, "r") as file:
+            return json.load(file)
+    return []
 
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "content": self.content,
-            "completed": self.completed,
-            "date_created": self.date_created
-        }
+def save_tasks(tasks):
+    with open(TASKS_FILE, "w") as file:
+        json.dump(tasks, file, indent=4)
 
 @app.route('/tasks', methods=['GET'])
 def get_tasks():
-    tasks = Todo.query.order_by(Todo.date_created).all()
-    return make_response(jsonify([task.to_dict() for task in tasks]), 200)
+    tasks = load_tasks()
+    return make_response(jsonify(tasks), 200)
 
 @app.route('/tasks', methods=['POST'])
 def add_task():
@@ -31,40 +27,41 @@ def add_task():
     if not data or 'content' not in data:
         return make_response(jsonify({"error": "Content is required"}), 400)
     
-    new_task = Todo(content=data['content'], completed=data.get('completed', False))
-    try:
-        db.session.add(new_task)
-        db.session.commit()
-        return make_response(jsonify(new_task.to_dict()), 201)
-    except Exception as e:
-        return make_response(jsonify({"error": f"Could not add task: {e}"}), 500)
+    tasks = load_tasks()
+    new_task = {
+        "id": len(tasks) + 1,
+        "content": data['content'],
+        "completed": data.get('completed', False),
+        "date_created": datetime.utcnow().isoformat()
+    }
+    tasks.append(new_task)
+    save_tasks(tasks)
+    return make_response(jsonify(new_task), 201)
 
 @app.route('/tasks/<int:id>', methods=['DELETE'])
 def delete_task(id):
-    task = Todo.query.get_or_404(id)
-    try:
-        db.session.delete(task)
-        db.session.commit()
-        return make_response(jsonify({"message": "Task deleted"}), 200)
-    except:
-        return make_response(jsonify({"error": "Could not delete task"}), 500)
+    tasks = load_tasks()
+    tasks = [task for task in tasks if task["id"] != id]
+    save_tasks(tasks)
+    return make_response(jsonify({"message": "Task deleted"}), 200)
 
 @app.route('/tasks/<int:id>', methods=['PUT'])
 def update_task(id):
-    task = Todo.query.get_or_404(id)
+    tasks = load_tasks()
     data = request.get_json()
     if not data or 'content' not in data:
         return make_response(jsonify({"error": "Content is required"}), 400)
     
-    task.content = data['content']
-    task.completed = data.get('completed', task.completed)
-    try:
-        db.session.commit()
-        return make_response(jsonify(task.to_dict()), 200)
-    except:
-        return make_response(jsonify({"error": "Could not update task"}), 500)
+    for task in tasks:
+        if task["id"] == id:
+            task["content"] = data["content"]
+            task["completed"] = data.get("completed", task["completed"])
+            save_tasks(tasks)
+            return make_response(jsonify(task), 200)
+    
+    return make_response(jsonify({"error": "Task not found"}), 404)
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
+    if not os.path.exists(TASKS_FILE):
+        save_tasks([])
     app.run(debug=True, port=8000, host='0.0.0.0')
