@@ -1,10 +1,13 @@
 from flask import Flask, request, jsonify, make_response
 import json
 import os
+from flask_cors import CORS
 from datetime import datetime
 
 app = Flask(__name__)
 TASKS_FILE = "tasks.json"
+
+CORS(app)
 
 def load_tasks():
     if os.path.exists(TASKS_FILE):
